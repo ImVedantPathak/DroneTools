@@ -1,34 +1,12 @@
-# pragma once
+#pragma once
 
-#include "cmath"
-#include "cstdint"
+#include <cmath>
+#include <cstdint>
+#include <algorithm>
 
-/*I like it fast, this just does (1/sqrt(x)) like really fast*/
-inline float invSqrt(float x){
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-    #pragma GCC diagnostic ignored "-Wuninitialized"
-
-        // prep values
-        float halfx = 0.5f * x;
-        float y = x;
-
-        // reinterprets the bits of the float as an integer
-        long i = *(long *)&y;
-
-        // divdes exponent by 2 then subtracts from magic number
-        // this ↓ magic number 1,597,463,007 in decimal
-        i = 0x5f3759df - (i >> 1);
-
-        // back to float, y is now a rough approximation
-        y = *(float *)&i;
-
-        // Newton-Raphson refinement
-        y = y * (1.5f - (halfx * y * y));
-        y = y * (1.5f - (halfx * y * y));
-
-    #pragma GCC dignostic pop
-        return y;
+template <typename T>
+[[nodiscard]] inline constexpr T invSqrt(T x) noexcept {
+    return T(1) / std::sqrt(x);
 }
 
 template<typename T>
@@ -37,163 +15,156 @@ class VectorBase;
 class Quaternion
 {
 public:
-    float w = 1.f;
-    float x = 0.f;
-    float y = 0.f;
-    float z = 0.f;
+    float w{1.f}, x{0.f}, y{0.f}, z{0.f};
 
-    Quaternion() = default;
+    constexpr Quaternion() noexcept = default;
 
-    Quaternion(float nw, float nx, float ny, float nz) : w(nw), x(nx), y(ny), z(nz) {}
+    constexpr Quaternion(float nw, float nx, float ny, float nz) noexcept 
+        : w(nw), x(nx), y(ny), z(nz) {}
 
-    Quaternion getProduct(const Quaternion& q) const
+    [[nodiscard]] constexpr Quaternion operator*(const Quaternion& q) const noexcept
     {
-        return Quaternion(
+        return {
             w * q.w - x * q.x - y * q.y - z * q.z,
             w * q.x + x * q.w + y * q.z - z * q.y,
             w * q.y - x * q.z + y * q.w + z * q.x,
-            w * q.z + x * q.y - y * q.x + z * q.w);
+            w * q.z + x * q.y - y * q.x + z * q.w
+        };
     }
 
-    Quaternion operator*(const Quaternion& q) const
+    constexpr Quaternion& operator*=(const Quaternion& q) noexcept
     {
-        return getProduct(q);
-    }
-
-    Quaternion& operator*=(const Quaternion& q)
-    {
-        *this = getProduct(q);
+        *this = *this * q;
         return *this;
     }
 
-    Quaternion getConjugate() const
+    [[nodiscard]] constexpr Quaternion getConjugate() const noexcept
     {
-        return Quaternion(w, -x, -y, -z);
+        return {w, -x, -y, -z};
     }
 
-    float getMagnitude() const
+    [[nodiscard]] inline float getMagnitude() const noexcept
     {
-        return sqrt(w * w + x * x + y * y + z * z);
+        return std::sqrt(w * w + x * x + y * y + z * z);
     }
 
-    void normalize()
+    inline void normalize() noexcept
     {
-        float m = invSqrt(w * w + x * x + y * y + z * z);
-        (*this) *= m;
+        const float m = invSqrt(w * w + x * x + y * y + z * z);
+        *this *= m;
     }
 
-    Quaternion getNormalized() const
+    [[nodiscard]] inline Quaternion getNormalized() const noexcept
     {
         Quaternion r(w, x, y, z);
         r.normalize();
         return r;
     }
 
-    float get(size_t i) const
+    [[nodiscard]] constexpr float get(size_t i) const noexcept
     {
-        return i == 0 ? w : (i == 1 ? x : (i == 2 ? y : (i == 3 ? z : 0)));
+        return i == 0 ? w : (i == 1 ? x : (i == 2 ? y : (i == 3 ? z : 0.f)));
     }
 
-    Quaternion operator*(float v) const
+    [[nodiscard]] constexpr Quaternion operator*(float v) const noexcept
     {
-        return Quaternion(w * v, x * v, y * v, z * v);
+        return {w * v, x * v, y * v, z * v};
     }
 
-    Quaternion& operator*=(float v)
+    constexpr Quaternion& operator*=(float v) noexcept
     {
-        w *= v;
-        x *= v;
-        y *= v;
-        z *= v;
+        w *= v; x *= v; y *= v; z *= v;
         return *this;
     }
 
-    Quaternion operator/(float v) const
+    [[nodiscard]] constexpr Quaternion operator/(float v) const noexcept
     {
-        return Quaternion(w / v, x / v, y / v, z / v);
+        const float inv = 1.0f / v; // Multiply by inverse is faster than division
+        return {w * inv, x * inv, y * inv, z * inv};
     }
 
-    Quaternion operator+(const Quaternion& q) const
+    [[nodiscard]] constexpr Quaternion operator+(const Quaternion& q) const noexcept
     {
-        return Quaternion(w + q.w, x + q.x, y + q.y, z + q.z);
+        return {w + q.w, x + q.x, y + q.y, z + q.z};
     }
 
-    float static dot(const Quaternion& q1, const Quaternion& q2)
+    [[nodiscard]] static constexpr float dot(const Quaternion& q1, const Quaternion& q2) noexcept
     {
         return q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
     }
 
-    Quaternion static lerp(const Quaternion& q1, const Quaternion& q2, float t)
+    [[nodiscard]] static inline Quaternion lerp(const Quaternion& q1, const Quaternion& q2, float t) noexcept
     {
         return (q1 * (1.f - t) + q2 * t).getNormalized();
     }
 
-    Quaternion static slerp(const Quaternion& q1, const Quaternion& q2, float pc)
+    [[nodiscard]] static inline Quaternion slerp(const Quaternion& q1, const Quaternion& q2, float pc) noexcept
     {
         Quaternion qa = q1.getNormalized();
         Quaternion qb = q2.getNormalized();
 
         float cosHalfTheta = dot(qa, qb);
-        if (cosHalfTheta < 0)
+        if (cosHalfTheta < 0.f)
         {
-            qb = qb * -1.f;
+            qb *= -1.f;
             cosHalfTheta = -cosHalfTheta;
         }
 
-        if (std::fabs(cosHalfTheta) >= 0.995f)
+        if (std::abs(cosHalfTheta) >= 0.995f)
         {
             return lerp(qa, qb, pc);
         }
 
-        float halfTheta = acosf(cosHalfTheta);
-        float sinHalfTheta = sqrtf(1.0 - cosHalfTheta * cosHalfTheta);
+        const float halfTheta = std::acos(cosHalfTheta);
+        const float sinHalfTheta = std::sqrt(1.0f - cosHalfTheta * cosHalfTheta);
 
-        if (std::fabs(sinHalfTheta) < 0.001)
+        if (std::abs(sinHalfTheta) < 0.001f)
         {
-            return (qa + qb) / 2.f;
+            return (qa + qb) * 0.5f;
         }
 
-        float ra = sinf((1.f - pc) * halfTheta) / sinHalfTheta;
-        float rb = sinf(pc * halfTheta) / sinHalfTheta;
+        const float invSinHalfTheta = 1.0f / sinHalfTheta;
+        const float ra = std::sin((1.f - pc) * halfTheta) * invSinHalfTheta;
+        const float rb = std::sin(pc * halfTheta) * invSinHalfTheta;
 
         return qa * ra + qb * rb;
     }
 
     template<typename T>
-    void toAngleVector(float &angle, VectorBase<T>& v) const
+    inline void toAngleVector(float& angle, VectorBase<T>& v) const noexcept
     {
-        float halfTheta = acosf(w);
-        float sinHalfTheta = sinf(halfTheta);
+        const float halfTheta = std::acos(std::clamp(w, -1.0f, 1.0f));
+        const float sinHalfTheta = std::sin(halfTheta);
         angle = 2.0f * halfTheta;
-        if (sinHalfTheta == 0)
+        
+        if (std::abs(sinHalfTheta) < 1e-6f)
         {
-            v.x = 1.0;
-            v.y = 0;
-            v.z = 0;
+            v.x = T(1); v.y = T(0); v.z = T(0);
         }
         else
         {
-            v.x = x / sinHalfTheta;
-            v.y = y / sinHalfTheta;
-            v.z = z / sinHalfTheta;
+            const float invSin = 1.0f / sinHalfTheta;
+            v.x = static_cast<T>(x * invSin);
+            v.y = static_cast<T>(y * invSin);
+            v.z = static_cast<T>(z * invSin);
         }
     }
 
     template<typename T>
-    void fromAngleVector(float angle, const VectorBase<T>& v)
+    inline void fromAngleVector(float angle, const VectorBase<T>& v) noexcept
     {
-        float halfAngle = angle * 0.5f;
-        float sinHalfTheta = sinf(halfAngle);
-        w = cosf(halfAngle);
-        x = v.x * sinHalfTheta;
-        y = v.y * sinHalfTheta;
-        z = v.z * sinHalfTheta;
+        const float halfAngle = angle * 0.5f;
+        const float sinHalfTheta = std::sin(halfAngle);
+        w = std::cos(halfAngle);
+        x = static_cast<float>(v.x) * sinHalfTheta;
+        y = static_cast<float>(v.y) * sinHalfTheta;
+        z = static_cast<float>(v.z) * sinHalfTheta;
     }
 
     template<typename T>
-    void fromAngularVelocity(const VectorBase<T>& v, float dt)
+    inline void fromAngularVelocity(const VectorBase<T>& v, float dt) noexcept
     {
-        float theta = v.getMagnitude() * dt;
+        const float theta = v.getMagnitude() * dt;
         fromAngleVector(theta, v.getNormalized());
     }
 };
@@ -202,129 +173,118 @@ template<typename T>
 class VectorBase
 {
 public:
-    T x = T{};
-    T y = T{};
-    T z = T{};
+    T x{0}, y{0}, z{0};
 
-    VectorBase() = default;
-    VectorBase(const VectorBase& o) = default;
-    VectorBase(T nx, T ny, T nz) : x{nx}, y{ny}, z{nz} {}
+    constexpr VectorBase() noexcept = default;
+    constexpr VectorBase(T nx, T ny, T nz) noexcept : x{nx}, y{ny}, z{nz} {}
 
-    VectorBase& operator=(const VectorBase& o)
+    [[nodiscard]] constexpr T get(size_t i) const noexcept { return i == 0 ? x : (i == 1 ? y : (i == 2 ? z : T(0))); }
+    [[nodiscard]] constexpr T operator[](size_t i) const noexcept { return get(i); }
+
+    constexpr void set(size_t i, T v) noexcept { if(i == 0) x = v; else if(i == 1) y = v; else if(i == 2) z = v; }
+
+    [[nodiscard]] explicit constexpr operator VectorBase<float>() const noexcept
     {
-        if (this == &o)
-            return *this;
-        x = o.x;
-        y = o.y;
-        z = o.z;
+        return VectorBase<float>(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
+    }
+
+    [[nodiscard]] inline T getMagnitude() const noexcept
+    {
+        return std::sqrt(x * x + y * y + z * z);
+    }
+
+    inline VectorBase<T>& normalize() noexcept
+    {
+        const T m = invSqrt(x * x + y * y + z * z);
+        *this *= m;
         return *this;
     }
 
-    T get(size_t i) const { return i == 0 ? x : (i == 1 ? y : (i == 2 ? z : T())); }
-    T operator[](size_t i) const { return get(i); }
-
-    void set(size_t i, T v) { i == 0 ? x = v : (i == 1 ? y = v : (i == 2 ? z = v : false)); }
-
-    operator VectorBase<float>() const
+    [[nodiscard]] inline VectorBase<T> getNormalized() const noexcept
     {
-        return VectorBase<float>(x, y, z);
+        VectorBase<T> r(*this);
+        return r.normalize();
     }
 
-    float getMagnitude() const
+    inline void rotate(const Quaternion& q) noexcept
     {
-        return sqrtf(x * x + y * y + z * z);
-    }
-
-    VectorBase<T>& normalize()
-    {
-        float m = invSqrt(x * x + y * y + z * z);
-        (*this) *= m;
-        return *this;
-    }
-
-    VectorBase<T> getNormalized() const
-    {
-        VectorBase<T> r(x, y, z);
-        r.normalize();
-        return r;
-    }
-
-    void rotate(const Quaternion& q)
-    {
-        Quaternion p(0, x, y, z);
+        Quaternion p(0, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
         p = q * p * q.getConjugate();
-        x = p.x;
-        y = p.y;
-        z = p.z;
+        x = static_cast<T>(p.x);
+        y = static_cast<T>(p.y);
+        z = static_cast<T>(p.z);
     }
 
-    VectorBase<T> getRotated(const Quaternion& q) const
+    [[nodiscard]] inline VectorBase<T> getRotated(const Quaternion& q) const noexcept
     {
-        VectorBase<T> r(x, y, z);
+        VectorBase<T> r(*this);
         r.rotate(q);
         return r;
     }
 
-    float static dotProduct(const VectorBase<T>& a, const VectorBase<T>& b)
+    [[nodiscard]] static constexpr T dotProduct(const VectorBase<T>& a, const VectorBase<T>& b) noexcept
     {
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
 
-    VectorBase<T> static crossProduct(const VectorBase<T>& a, const VectorBase<T>& b)
+    [[nodiscard]] static constexpr VectorBase<T> crossProduct(const VectorBase<T>& a, const VectorBase<T>& b) noexcept
     {
-        VectorBase<T> r;
-        r.x = a.y * b.z - a.z * b.y;
-        r.y = a.z * b.x - a.x * b.z;
-        r.z = a.x * b.y - a.y * b.x;
-        return r;
+        return {
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x
+        };
     }
 
-    float dot(const VectorBase<T>& v) const
+    [[nodiscard]] constexpr T dot(const VectorBase<T>& v) const noexcept
     {
         return dotProduct(*this, v);
     }
 
-    VectorBase<T> cross(const VectorBase<T>& v) const
+    [[nodiscard]] constexpr VectorBase<T> cross(const VectorBase<T>& v) const noexcept
     {
         return crossProduct(*this, v);
     }
 
-    VectorBase<T> accelToEuler() const
+    [[nodiscard]] inline VectorBase<T> accelToEuler() const noexcept
     {
         VectorBase<T> na = getNormalized();
-        T x = atan2f(na.y, na.z);
-        T y = -atan2f(na.x, sqrt(na.y * na.y + na.z * na.z));
-        T z = 0.f;
-        return VectorBase<T>(x, y, z);
+        return {
+            static_cast<T>(std::atan2(na.y, na.z)),
+            static_cast<T>(-std::atan2(na.x, std::sqrt(na.y * na.y + na.z * na.z))),
+            T(0)
+        };
     }
 
-    Quaternion accelToQuaternion() const
+    [[nodiscard]] inline Quaternion accelToQuaternion() const noexcept
     {
         return diffVectors(VectorBase<T>(T(0), T(0), T(1)), *this, 1.0f);
     }
 
-    static Quaternion diffVectors(const VectorBase<T>& src, const VectorBase<T>& dst, float gain = 1.f)
+    [[nodiscard]] static inline Quaternion diffVectors(const VectorBase<T>& src, const VectorBase<T>& dst, float gain = 1.f) noexcept
     {
         VectorBase<T> src_n = src.getNormalized();
         VectorBase<T> dst_n = dst.getNormalized();
-        Quaternion q;
-
-        float angle = acosf(dst_n.dot(src_n));
+        
+        float angle = std::acos(std::clamp(static_cast<float>(dst_n.dot(src_n)), -1.0f, 1.0f));
         VectorBase<T> v = dst_n.cross(src_n).getNormalized();
+        
+        Quaternion q;
         q.fromAngleVector(angle * gain, v);
         return q.getNormalized();
     }
 
-    Quaternion eulerToQuaternion() const
+    [[nodiscard]] inline Quaternion eulerToQuaternion() const noexcept
     {
-        Quaternion q;
-        float cosX2 = cosf(x / 2.0f);
-        float sinX2 = sinf(x / 2.0f);
-        float cosY2 = cosf(y / 2.0f);
-        float sinY2 = sinf(y / 2.0f);
-        float cosZ2 = cosf(z / 2.0f);
-        float sinZ2 = sinf(z / 2.0f);
+        const float halfX = static_cast<float>(x) * 0.5f;
+        const float halfY = static_cast<float>(y) * 0.5f;
+        const float halfZ = static_cast<float>(z) * 0.5f;
+        
+        const float cosX2 = std::cos(halfX), sinX2 = std::sin(halfX);
+        const float cosY2 = std::cos(halfY), sinY2 = std::sin(halfY);
+        const float cosZ2 = std::cos(halfZ), sinZ2 = std::sin(halfZ);
 
+        Quaternion q;
         q.w = cosX2 * cosY2 * cosZ2 + sinX2 * sinY2 * sinZ2;
         q.x = sinX2 * cosY2 * cosZ2 - cosX2 * sinY2 * sinZ2;
         q.y = cosX2 * sinY2 * cosZ2 + sinX2 * cosY2 * sinZ2;
@@ -333,87 +293,68 @@ public:
         return q;
     }
 
-    VectorBase<T> eulerFromQuaternion(const Quaternion& q)
+    inline VectorBase<T>& eulerFromQuaternion(const Quaternion& q) noexcept
     {
-        x = atan2f(q.w * q.x + q.y * q.z, 0.5f - q.x * q.x - q.y * q.y);
-        y = asinf(-2.0f * (q.x * q.z - q.w * q.y));
-        z = atan2f(q.x * q.y + q.w * q.z, 0.5f - q.y * q.y - q.z * q.z);
+        x = static_cast<T>(std::atan2(2.0f * (q.w * q.x + q.y * q.z), 1.0f - 2.0f * (q.x * q.x + q.y * q.y)));
+        y = static_cast<T>(std::asin(std::clamp(2.0f * (q.w * q.y - q.z * q.x), -1.0f, 1.0f)));
+        z = static_cast<T>(std::atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.y * q.y + q.z * q.z)));
         return *this;
     }
 
-    VectorBase<T>& operator+=(const VectorBase<T>& o)
+    constexpr VectorBase<T>& operator+=(const VectorBase<T>& o) noexcept
     {
-        x += o.x;
-        y += o.y;
-        z += o.z;
+        x += o.x; y += o.y; z += o.z;
         return *this;
     }
 
-    VectorBase<T> operator+(const VectorBase<T>& o)
+    [[nodiscard]] constexpr VectorBase<T> operator+(const VectorBase<T>& o) const noexcept
     {
-        VectorBase<T> r(*this);
-        r += o;
-        return r;
+        return {x + o.x, y + o.y, z + o.z};
     }
 
-    VectorBase<T>& operator-=(const VectorBase<T>& o)
+    constexpr VectorBase<T>& operator-=(const VectorBase<T>& o) noexcept
     {
-        x -= o.x;
-        y -= o.y;
-        z -= o.z;
+        x -= o.x; y -= o.y; z -= o.z;
         return *this;
     }
 
-    VectorBase<T> operator-(const VectorBase<T>& o)
+    [[nodiscard]] constexpr VectorBase<T> operator-(const VectorBase<T>& o) const noexcept
     {
-        VectorBase<T> r(*this);
-        r -= o;
-        return r;
+        return {x - o.x, y - o.y, z - o.z};
     }
 
-    VectorBase<T>& operator*=(const VectorBase<T>& o)
+    constexpr VectorBase<T>& operator*=(const VectorBase<T>& o) noexcept
     {
-        x *= o.x;
-        y *= o.y;
-        z *= o.z;
+        x *= o.x; y *= o.y; z *= o.z;
         return *this;
     }
 
-    VectorBase<T> operator*(const VectorBase<T>& o)
+    [[nodiscard]] constexpr VectorBase<T> operator*(const VectorBase<T>& o) const noexcept
     {
-        VectorBase<T> r(*this);
-        r *= o;
-        return r;
+        return {x * o.x, y * o.y, z * o.z};
     }
 
-    VectorBase<T>& operator*=(T o)
+    constexpr VectorBase<T>& operator*=(T o) noexcept
     {
-        x *= o;
-        y *= o;
-        z *= o;
+        x *= o; y *= o; z *= o;
         return *this;
     }
 
-    VectorBase<T> operator*(T o)
+    [[nodiscard]] constexpr VectorBase<T> operator*(T o) const noexcept
     {
-        VectorBase<T> r(*this);
-        r *= o;
-        return r;
+        return {x * o, y * o, z * o};
     }
 
-    VectorBase<T>& operator/=(T o)
+    constexpr VectorBase<T>& operator/=(T o) noexcept
     {
-        x /= o;
-        y /= o;
-        z /= o;
+        // For floats/doubles, compiler will optimize to multiply by inverse
+        x /= o; y /= o; z /= o;
         return *this;
     }
 
-    VectorBase<T> operator/(T o)
+    [[nodiscard]] constexpr VectorBase<T> operator/(T o) const noexcept
     {
-        VectorBase<T> r(*this);
-        r /= o;
-        return r;
+        return {x / o, y / o, z / o};
     }
 };
 
@@ -421,16 +362,18 @@ template<typename T>
 class RotationMatrix
 {
 public:
-    RotationMatrix() = default;
+    constexpr RotationMatrix() noexcept = default;
 
-    void init(const VectorBase<T>& v)
+    inline void init(const VectorBase<T>& v) noexcept
     {
-        const T cosx = cosf(v.x);
-        const T sinx = sinf(v.x);
-        const T cosy = cosf(v.y);
-        const T siny = sinf(v.y);
-        const T cosz = cosf(v.z);
-        const T sinz = sinf(v.z);
+        // Using std functions allows the compiler to group sin/cos calls 
+        // using combined architecture instructions (e.g. fsincos on x86)
+        const T cosx = std::cos(v.x);
+        const T sinx = std::sin(v.x);
+        const T cosy = std::cos(v.y);
+        const T siny = std::sin(v.y);
+        const T cosz = std::cos(v.z);
+        const T sinz = std::sin(v.z);
 
         const T coszcosx = cosz * cosx;
         const T sinzcosx = sinz * cosx;
@@ -440,27 +383,30 @@ public:
         _m[0][0] = cosz * cosy;
         _m[0][1] = -cosy * sinz;
         _m[0][2] = siny;
+        
         _m[1][0] = sinzcosx + (coszsinx * siny);
         _m[1][1] = coszcosx - (sinzsinx * siny);
         _m[1][2] = -sinx * cosy;
-        _m[2][0] = (sinzsinx) - (coszcosx * siny);
-        _m[2][1] = (coszsinx) + (sinzcosx * siny);
+        
+        _m[2][0] = sinzsinx - (coszcosx * siny);
+        _m[2][1] = coszsinx + (sinzcosx * siny);
         _m[2][2] = cosy * cosx;
     }
 
-    VectorBase<T> apply(const VectorBase<T>& v)
+    [[nodiscard]] constexpr VectorBase<T> apply(const VectorBase<T>& v) const noexcept
     {
-        const T x = _m[0][0] * v.x + _m[1][0] * v.y + _m[2][0] * v.z;
-        const T y = _m[0][1] * v.x + _m[1][1] * v.y + _m[2][1] * v.z;
-        const T z = _m[0][2] * v.x + _m[1][2] * v.y + _m[2][2] * v.z;
-        return VectorBase<T>{x, y, z};
+        return {
+            _m[0][0] * v.x + _m[1][0] * v.y + _m[2][0] * v.z,
+            _m[0][1] * v.x + _m[1][1] * v.y + _m[2][1] * v.z,
+            _m[0][2] * v.x + _m[1][2] * v.y + _m[2][2] * v.z
+        };
     }
 
 private:
     T _m[3][3] = {
-        {T{1}, T{0}, T{0}},
-        {T{0}, T{1}, T{0}},
-        {T{0}, T{0}, T{1}},
+        {T(1), T(0), T(0)},
+        {T(0), T(1), T(0)},
+        {T(0), T(0), T(1)}
     };
 };
 
