@@ -36,27 +36,10 @@ it provides everything from low-level ESC drivers to a fully interactive
 
 ------------------------------------------------------------------------
 
-### Real-time Telemetry Visualizer
-
--   **3D Visualization**\
-    Built with Three.js to display real-time pitch, roll, and yaw.
-
--   **Live Graphing**\
-    Streams IMU and aerodynamic data via WebSockets.
-
--   **Modular Dashboard**\
-    Interactive UI for monitoring system health and sensors.
-
--   **Python Bridge**\
-    Serial-to-WebSocket bridge for seamless telemetry streaming.
-
-------------------------------------------------------------------------
-
 ## Project Structure
 
     DroneTools/
     │
-    ├── drone-telemetry/     # Web-based 3D visualizer (HTML/JS/Three.js)
     ├── lib/
     │   ├── AHRS/            # Kalman & Madgwick filters
     │   ├── Espfc/           # Core flight controller logic (PID, mixers, RC, sensors)
@@ -76,20 +59,6 @@ it provides everything from low-level ESC drivers to a fully interactive
 -   Install board support for ESP32 / RP2040
 -   Configure your pins in `readings.ino`
 -   Upload to your flight controller
-
-------------------------------------------------------------------------
-
-### 2. Run the Telemetry Bridge
-
-Install dependencies:
-
-    pip install pyserial websockets
-
-Run the bridge:
-
-    python bridge.py --port COM_PORT --baud 115200
-
-Replace `COM_PORT` with your actual serial port.
 
 ------------------------------------------------------------------------
 
